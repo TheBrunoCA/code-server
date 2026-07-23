@@ -4,8 +4,8 @@ USER root
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
         bash \
         build-essential \
         ca-certificates \
@@ -18,16 +18,13 @@ RUN apt-get update && \
         zip \
     && rm -rf /var/lib/apt/lists/*
 
-# Diretórios utilizados pelo mise.
+# Configuração global do mise
 ENV MISE_INSTALL_PATH=/usr/local/bin/mise
 ENV MISE_DATA_DIR=/opt/mise
 ENV MISE_CACHE_DIR=/opt/mise/cache
+ENV PATH=/opt/mise/shims:/usr/lib/code-server/lib/vscode/bin/remote-cli:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games
 
-# Os shims permitem usar go, python, node etc. em shells interativos
-# e também em processos não interativos.
-ENV PATH="/opt/mise/shims:/usr/local/bin:${PATH}"
-
-# Prepara os diretórios antes de instalar e concede acesso ao usuário coder.
+# Cria os diretórios antes da instalação
 RUN mkdir -p \
         /opt/mise/cache \
         /opt/mise/shims \
@@ -36,12 +33,29 @@ RUN mkdir -p \
         /opt/mise \
         /home/coder/.config
 
-# Instala o binário globalmente.
+# Instala o mise globalmente
 RUN curl -fsSL https://mise.run | sh \
     && test -x /usr/local/bin/mise \
-    && mise --version
+    && /usr/local/bin/mise --version
 
-# Sudo sem senha para tarefas administrativas no ambiente de desenvolvimento.
+# Garante o PATH em shells login
+RUN printf '%s\n' \
+        'export MISE_DATA_DIR=/opt/mise' \
+        'export MISE_CACHE_DIR=/opt/mise/cache' \
+        'export PATH="/opt/mise/shims:$PATH"' \
+        > /etc/profile.d/mise.sh \
+    && chmod 0644 /etc/profile.d/mise.sh
+
+# Garante o PATH também no bash interativo usado pelo terminal do code-server
+RUN printf '%s\n' \
+        '' \
+        '# mise' \
+        'export MISE_DATA_DIR=/opt/mise' \
+        'export MISE_CACHE_DIR=/opt/mise/cache' \
+        'export PATH="/opt/mise/shims:$PATH"' \
+        >> /etc/bash.bashrc
+
+# Sudo sem senha
 RUN printf '%s\n' \
         'coder ALL=(ALL) NOPASSWD:ALL' \
         > /etc/sudoers.d/coder \
@@ -49,6 +63,3 @@ RUN printf '%s\n' \
 
 USER coder
 WORKDIR /home/coder
-
-# Confirma que o mise enxerga os diretórios configurados.
-RUN mise doctor || true
