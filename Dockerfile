@@ -32,3 +32,5 @@ RUN mkdir -p /opt/mise && \
     chown -R 1000:1000 /opt/mise
 
 USER coder
+
+RUN echo 'eval "$(mise activate bash)"' >> /home/coder/.bashrc
